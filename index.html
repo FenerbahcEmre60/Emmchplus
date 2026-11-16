@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0B0F17">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="application-name" content="Emmch+">
+    <title>Emmch+ | Smart Health & Büro-Planer</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js für den Gewichtsverlauf -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        bgDark: '#0B0F17',
+                        cardDark: '#131926',
+                        cardBorder: '#1E293B',
+                        emeraldAccent: '#10B981',
+                        cyanAccent: '#06B6D4',
+                        amberAccent: '#F59E0B',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Optimierung für Samsung Galaxy S24+ & Mobile Viewport */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #0B0F17;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        .glass-card {
+            background: rgba(19, 25, 38, 0.78);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+        }
+        .glass-nav {
+            background: rgba(11, 15, 23, 0.88);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        /* Verstecke Scrollbars für sauberes App-Feeling */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.25s ease-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.3); }
+            50% { box-shadow: 0 0 28px rgba(6, 182, 212, 0.65); }
+        }
+        .water-glow {
+            animation: pulseGlow 3s infinite;
+        }
+        input[type="number"], input[type="text"], input[type="date"], select {
+            user-select: text;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex justify-center bg-[#06080D]">
+
+    <!-- App Container (S24+ optimierte Breite mit Desktop-Zentrierung) -->
+    <div class="w-full max-w-[440px] min-h-screen bg-bgDark relative flex flex-col shadow-2xl border-x border-white/5 pb-24">
+
+        <!-- Top Header -->
+        <header class="sticky top-0 z-30 glass-nav px-5 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <span class="font-display font-extrabold text-bgDark text-lg tracking-tighter">E+</span>
+                </div>
+                <div>
+                    <h1 class="font-display font-bold text-lg tracking-tight text-white leading-none">Emmch<span class="text-emeraldAccent">+</span></h1>
+                    <p id="header-date" class="text-[11px] text-slate-400 mt-0.5 font-medium">Lade Datum...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Wasser-Timer Pill -->
+                <button onclick="triggerWaterReminderManual()" id="timer-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold active:scale-95 transition">
+                    <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i>
+                    <span id="countdown-display">45:00</span>
+                </button>
+                <!-- Install Button -->
+                <button onclick="openInstallModal()" class="p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 active:scale-95 transition" title="Auf S24+ installieren">
+                    <i data-lucide="smartphone" class="w-4 h-4 text-emeraldAccent"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- In-App Benachrichtigungs-Banner (für Wasser-Erinnerung & Feedback) -->
+        <div id="in-app-toast" class="fixed top-20 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-50 hidden transition-all duration-300">
+            <div class="glass-card border-cyan-400/50 bg-[#0F172A]/95 rounded-2xl p-4 shadow-2xl flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center shrink-0 text-cyan-400">
+                    <i data-lucide="droplets" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                    <h4 id="toast-title" class="font-bold text-sm text-white">Zeit für Wasser! 💧</h4>
+                    <p id="toast-body" class="text-xs text-slate-300 mt-0.5">Trinke jetzt ein Glas Wasser (250 ml) für deinen Fokus im Büro.</p>
+                    <div class="flex gap-2 mt-2.5">
+                        <button onclick="addWater(250); hideToast();" class="px-3 py-1.5 rounded-lg bg-cyan-500 text-bgDark font-bold text-xs active:scale-95">+ 250 ml verbuchen</button>
+                        <button onclick="hideToast()" class="px-3 py-1.5 rounded-lg bg-white/10 text-slate-300 text-xs">Später</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 px-4 pt-4 space-y-5">
+
+            <!-- ========================================== -->
+            <!-- TAB 1: DASHBOARD                           -->
+            <!-- ========================================== -->
+            <section id="tab-dashboard" class="tab-content active space-y-4">
+                
+                <!-- Gewichts-Fortschritt Hero Card -->
+                <div class="glass-card rounded-3xl p-5 relative overflow-hidden">
+                    <div class="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl"></div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-xs font-semibold uppercase tracking-wider text-emeraldAccent">Dein Fortschritt</span>
+                            <h2 class="font-display text-2xl font-extrabold text-white mt-0.5" id="dash-lost-text">0.0 kg abgenommen</h2>
+                        </div>
+                        <button onclick="switchTab('weight')" class="text-xs bg-emerald-500/15 text-emeraldAccent border border-emerald-500/30 px-3 py-1.5 rounded-xl font-semibold active:scale-95">
+                            + Wiegen
+                        </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full h-3 bg-slate-800/90 rounded-full overflow-hidden p-0.5 border border-white/5">
+                        <div id="dash-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500" style="width: 15%"></div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/5 text-center">
+                        <div>
+                            <p class="text-[11px] text-slate-400">Aktuell</p>
+                            <p class="font-bold text-sm text-white" id="dash-current-weight">-- kg</p>
+                        </div>
+                        <div class="border-x border-white/5">
+                            <p class="text-[11px] text-slate-400">Zielgewicht</p>
+                            <p class="font-bold text-sm text-emeraldAccent" id="dash-target-weight">-- kg</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-slate-400">Noch bis Ziel</p>
+                            <p class="font-bold text-sm text-slate-200" id="dash-remaining-weight">-- kg</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wasser & Kaffee Tracker Grid -->
+                <div class="grid grid-cols-1 gap-4">
+                    
+                    <!-- Wasser Card -->
+                    <div class="glass-card rounded-3xl p-5 border-cyan-500/20">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 water-glow">
+                                    <i data-lucide="droplet" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-base text-white">Wasser-Tracker</h3>
+                                    <p class="text-xs text-slate-400">Erinnerung alle <span id="dash-interval-label">45</span> Min (06–21 Uhr)</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="water-current" class="font-display font-extrabold text-xl text-cyan-400">0.00</span>
+                                <span class="text-xs text-slate-400">/ <span id="water-goal-label">2.75</span> L</span>
+                            </div>
+                        </div>
+
+                        <!-- Wasser Balken -->
+                        <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mb-4">
+                            <div id="water-bar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+
+                        <!-- Quick Add Wasser Buttons -->
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="addWater(250)" class="py-2.5 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 250 ml
+                            </button>
+                            <button onclick="addWater(500)" class="py-2.5 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 500 ml
+                            </button>
+                            <button onclick="resetWater()" class="py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 font-medium text-xs flex items-center justify-center gap-1 active:scale-95 transition">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kaffee & Wachmacher Card (für wenig Schlaf) -->
+                    <div class="glass-card rounded-3xl p-5 border-amber-500/20">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                                    <i data-lucide="coffee" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-base text-white">Kaffee & Büro-Energie</h3>
+                                    <p class="text-xs text-slate-400">Ausgleich für wenig Schlaf</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="coffee-count" class="font-display font-extrabold text-xl text-amber-400">0</span>
+                                <span class="text-xs text-slate-400">Tassen</span>
+                            </div>
+                        </div>
+
+                        <p id="coffee-tip" class="text-xs text-amber-200/80 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 mb-3">
+                            💡 Tipp: Zu jedem Kaffee direkt 1 Glas Wasser trinken, um Müdigkeit vorzubeugen.
+                        </p>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="addCoffee('Espresso / Kaffee')" class="py-2.5 px-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold text-xs flex flex-col items-center justify-center gap-0.5 active:scale-95 transition">
+                                <span>☕ +1 Kaffee</span>
+                                <span class="text-[10px] text-amber-400/70">Schwarz / Espresso</span>
+                            </button>
+                            <button onclick="addCoffee('Grüntee Matcha/Sencha')" class="py-2.5 px-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex flex-col items-center justify-center gap-0.5 active:scale-95 transition">
+                                <span>🍵 +1 Grüntee</span>
+                                <span class="text-[10px] text-emerald-400/70">Langer Fokus</span>
+                            </button>
+                            <button onclick="resetCoffee()" class="py-2.5 px-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-medium text-xs flex items-center justify-center active:scale-95 transition">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heutiger Büro-Essensplan Vorschau -->
+                <div class="glass-card rounded-3xl p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <span class="text-[11px] font-semibold uppercase tracking-wider text-emeraldAccent">Heute im Büro (06:00 – 17:00)</span>
+                            <h3 class="font-bold text-base text-white" id="dash-today-title">Tagesplan</h3>
+                        </div>
+                        <button onclick="switchTab('meals')" class="text-xs text-slate-300 hover:text-white flex items-center gap-1 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                            Woche <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <div id="dash-today-meals" class="space-y-2.5">
+                        <!-- Wird per JS befüllt -->
+                    </div>
+
+                    <!-- Abend-Heisshunger Notfall-Button -->
+                    <button onclick="openCravingModal()" class="w-full mt-4 py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 text-purple-200 font-semibold text-xs flex items-center justify-center gap-2 active:scale-98 transition">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+                        Abends Heisshunger nach 18 Uhr? Hier klicken!
+                    </button>
+                </div>
+
+            </section>
+
+            <!-- ========================================== -->
+            <!-- TAB 2: ESSENSPLAN (MO - FR)                -->
+            <!-- ========================================== -->
+            <section id="tab-meals" class="tab-content space-y-4">
+                
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-display text-xl font-extrabold text-white">Büro-Essensplan</h2>
+                        <p class="text-xs text-slate-400">Mo–Fr • 06:00–17:00 Uhr • Ohne Fleisch (ausser Döner)</p>
+                    </div>
+                    <button onclick="regenerateFullWeek()" class="px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emeraldAccent text-xs font-bold flex items-center gap-1.5 active:scale-95 transition">
+                        <i data-lucide="shuffle" class="w-3.5 h-3.5"></i> Neu mischen
+                    </button>
+                </div>
+
+                <!-- Wochentag Selector (Mo - Fr) -->
+                <div class="grid grid-cols-5 gap-1.5 bg-cardDark p-1.5 rounded-2xl border border-white/5" id="weekday-selector">
+                    <!-- Buttons per JS -->
+                </div>
+
+                <!-- Tages-Übersicht Karte -->
+                <div id="meal-day-container" class="space-y-3">
+                    <!-- Mahlzeiten des gewählten Tages werden per JS gerendert -->
+                </div>
+
+                <!-- 18:00 Uhr Freies Abendessen & Heisshunger Karte -->
+                <div class="glass-card rounded-3xl p-4 border-purple-500/25">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold text-xs">
+                                18:00
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-white">Abendessen: Frei nach Wahl</h4>
+                                <p class="text-xs text-slate-400">Kein fester Plan – geniesse deinen Feierabend.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="openCravingModal()" class="w-full mt-3 py-2.5 px-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-200 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+                        <i data-lucide="flame" class="w-4 h-4 text-purple-400"></i>
+                        Heisshunger-Hilfe: Leichte Abend-Ideen anzeigen
+                    </button>
+                </div>
+
+            </section>
+
+            <!-- ========================================== -->
+            <!-- TAB 3: GEWICHT & VERLAUF                   -->
+            <!-- ========================================== -->
+            <section id="tab-weight" class="tab-content space-y-4">
+                
+                <div>
+                    <h2 class="font-display text-xl font-extrabold text-white">Gewicht & Verlauf</h2>
+                    <p class="text-xs text-slate-400">Trage jede Woche dein Gewicht ein und verfolge deinen Erfolg.</p>
+                </div>
+
+                <!-- Neues Gewicht eintragen -->
+                <div class="glass-card rounded-3xl p-5">
+                    <h3 class="font-bold text-sm text-white mb-3 flex items-center gap-2">
+                        <i data-lucide="scale" class="w-4 h-4 text-emeraldAccent"></i>
+                        Wöchentliches Wiegen eintragen
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Gewicht (kg)</label>
+                            <input type="number" step="0.1" id="input-new-weight" placeholder="z.B. 84.5" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Datum</label>
+                            <input type="date" id="input-new-date" class="w-full bg-bgDark border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                    </div>
+                    <button onclick="logNewWeight()" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-bgDark font-extrabold text-sm shadow-lg shadow-emerald-500/20 active:scale-98 transition">
+                        Gewicht speichern
+                    </button>
+                </div>
+
+                <!-- Kennzahlen Grid (BMI, Start, Verlust) -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="glass-card rounded-2xl p-3.5 text-center">
+                        <p class="text-[11px] text-slate-400">Startgewicht</p>
+                        <p id="stat-start-weight" class="font-bold text-base text-white mt-0.5">-- kg</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-3.5 text-center border-emerald-500/20">
+                        <p class="text-[11px] text-slate-400">Veränderung</p>
+                        <p id="stat-total-diff" class="font-bold text-base text-emeraldAccent mt-0.5">0.0 kg</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-3.5 text-center">
+                        <p class="text-[11px] text-slate-400">Aktueller BMI</p>
+                        <p id="stat-bmi" class="font-bold text-base text-cyan-400 mt-0.5">--</p>
+                    </div>
+                </div>
+
+                <!-- Verlaufs-Chart -->
+                <div class="glass-card rounded-3xl p-4">
+                    <h3 class="font-bold text-sm text-white mb-2">Gewichtskurve</h3>
+                    <div class="w-full h-52 relative">
+                        <canvas id="weightChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Historien-Liste -->
+                <div class="glass-card rounded-3xl p-5">
+                    <h3 class="font-bold text-sm text-white mb-3">Wochen-Historie</h3>
+                    <div id="weight-history-list" class="space-y-2.5 max-h-64 overflow-y-auto">
+                        <!-- Einträge per JS -->
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ========================================== -->
+            <!-- TAB 4: PROFIL & SETUP                      -->
+            <!-- ========================================== -->
+            <section id="tab-profile" class="tab-content space-y-4">
+                
+                <div>
+                    <h2 class="font-display text-xl font-extrabold text-white">Profil & Einstellungen</h2>
+                    <p class="text-xs text-slate-400">Passe deine Körperdaten und Wasser-Erinnerungen an.</p>
+                </div>
+
+                <!-- Samsung S24+ Installations-Banner -->
+                <div class="glass-card rounded-3xl p-4 border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-cardDark">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emeraldAccent shrink-0">
+                            <i data-lucide="download" class="w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-sm text-white">Als App auf Galaxy S24+ installieren</h3>
+                            <p class="text-xs text-slate-300 mt-1">Installiere Emmch+ wie eine normale App auf deinem Startbildschirm – inklusive App-Icon & Vollbild.</p>
+                            <button onclick="openInstallModal()" class="mt-2.5 px-3.5 py-1.5 rounded-xl bg-emeraldAccent text-bgDark font-bold text-xs active:scale-95">
+                                Anleitung öffnen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Persönliche Daten Formular -->
+                <div class="glass-card rounded-3xl p-5 space-y-3.5">
+                    <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                        <i data-lucide="user-cog" class="w-4 h-4 text-emeraldAccent"></i>
+                        Deine Körperdaten & Ziele
+                    </h3>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Dein Name (optional)</label>
+                        <input type="text" id="prof-name" placeholder="Emmch" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-emeraldAccent">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Grösse (cm)</label>
+                            <input type="number" id="prof-height" placeholder="178" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Zielgewicht (kg)</label>
+                            <input type="number" step="0.1" id="prof-target-weight" placeholder="78.0" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Startgewicht (kg)</label>
+                            <input type="number" step="0.1" id="prof-start-weight" placeholder="88.0" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Tagesziel Wasser (L)</label>
+                            <input type="number" step="0.25" id="prof-water-goal" placeholder="2.75" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-emeraldAccent">
+                        </div>
+                    </div>
+
+                    <!-- Wasser-Erinnerungs-Intervall -->
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Wasser-Erinnerung im Büro (06:00 – 21:00 Uhr)</label>
+                        <select id="prof-water-interval" class="w-full bg-bgDark border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-400">
+                            <option value="30">Alle 30 Minuten</option>
+                            <option value="45" selected>Alle 45 Minuten (Empfohlen)</option>
+                            <option value="60">Alle 60 Minuten</option>
+                            <option value="90">Alle 90 Minuten</option>
+                        </select>
+                    </div>
+
+                    <button onclick="requestSystemNotifications()" class="w-full py-2.5 px-3 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95">
+                        <i data-lucide="bell" class="w-4 h-4"></i>
+                        Push-Benachrichtigungen aktivieren / testen
+                    </button>
+
+                    <button onclick="saveProfileSettings()" class="w-full py-3 rounded-xl bg-emeraldAccent text-bgDark font-extrabold text-sm shadow-lg shadow-emerald-500/20 active:scale-98 transition">
+                        Einstellungen speichern
+                    </button>
+                </div>
+
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="fixed bottom-0 w-full max-w-[440px] glass-nav z-40 px-2 py-2 grid grid-cols-4 gap-1">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center justify-center py-1.5 rounded-2xl text-emeraldAccent bg-emerald-500/10 transition">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold mt-1">Heute</span>
+            </button>
+            <button onclick="switchTab('meals')" id="nav-meals" class="nav-btn flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-200 transition">
+                <i data-lucide="utensils" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium mt-1">Essensplan</span>
+            </button>
+            <button onclick="switchTab('weight')" id="nav-weight" class="nav-btn flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-200 transition">
+                <i data-lucide="trending-down" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium mt-1">Verlauf</span>
+            </button>
+            <button onclick="switchTab('profile')" id="nav-profile" class="nav-btn flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-200 transition">
+                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                <span class="text-[10px] font-medium mt-1">Setup</span>
+            </button>
+        </nav>
+
+        <!-- ========================================== -->
+        <!-- MODAL 1: ABEND-HEISSHUNGER NOTFALL-PLAN    -->
+        <!-- ========================================== -->
+        <div id="craving-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-4">
+            <div class="glass-card w-full max-w-[400px] rounded-3xl p-5 border-purple-500/30 animate-[fadeIn_0.2s_ease-out]">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        </div>
+                        <h3 class="font-display font-bold text-base text-white">Abend-Heisshunger Stopper</h3>
+                    </div>
+                    <button onclick="closeCravingModal()" class="p-1.5 rounded-full bg-white/10 text-slate-300">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-slate-300 mb-3">
+                    Nach 18:00 Uhr hast du frei. Wenn später der Heisshunger kommt, greif zu diesen leichten Optionen (ohne Fleisch, wenig Kalorien, machen satt):
+                </p>
+                <div id="craving-suggestions" class="space-y-2 max-h-72 overflow-y-auto mb-4">
+                    <!-- Vorschläge per JS -->
+                </div>
+                <button onclick="renderCravingIdeas()" class="w-full py-2.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Andere Ideen zeigen
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- MODAL 2: SAMSUNG GALAXY S24+ INSTALLATION  -->
+        <!-- ========================================== -->
+        <div id="install-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-4">
+            <div class="glass-card w-full max-w-[400px] rounded-3xl p-5 border-emerald-500/30">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emeraldAccent">
+                            <i data-lucide="smartphone" class="w-4 h-4"></i>
+                        </div>
+                        <h3 class="font-display font-bold text-base text-white">Emmch+ auf S24+ installieren</h3>
+                    </div>
+                    <button onclick="closeInstallModal()" class="p-1.5 rounded-full bg-white/10 text-slate-300">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="space-y-3 text-xs text-slate-300">
+                    <p>So installierst du <strong class="text-white">Emmch+</strong> als echte App auf deinem Samsung Galaxy S24+:</p>
+                    <div class="bg-bgDark/90 p-3 rounded-2xl border border-white/5 space-y-2">
+                        <p><span class="text-emeraldAccent font-bold">1.</span> Öffne diese Seite auf deinem S24+ in <strong class="text-white">Google Chrome</strong> oder <strong class="text-white">Samsung Internet</strong>.</p>
+                        <p><span class="text-emeraldAccent font-bold">2.</span> Tippe oben rechts auf das <strong class="text-white">Drei-Punkte-Menü (⋮)</strong>.</p>
+                        <p><span class="text-emeraldAccent font-bold">3.</span> Wähle <strong class="text-white">„Zum Startbildschirm hinzufügen“</strong> oder <strong class="text-white">„App installieren“</strong>.</p>
+                        <p><span class="text-emeraldAccent font-bold">4.</span> Bestätige mit <strong class="text-white">Installieren</strong> – das <span class="text-emeraldAccent font-bold">Emmch+</span> Icon erscheint direkt auf deinem Homescreen!</p>
+                    </div>
+                    <button id="native-install-btn" onclick="triggerNativeInstall()" class="hidden w-full py-3 rounded-xl bg-emeraldAccent text-bgDark font-extrabold text-xs">
+                        Jetzt direkt installieren
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIK -->
+    <script>
+        // ==========================================
+        // 1. DYNAMISCHES PWA MANIFEST FÜR ANDROID
+        // ==========================================
+        if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const btn = document.getElementById('native-install-btn');
+            if (btn) btn.classList.remove('hidden');
+        });
+
+        function triggerNativeInstall() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => {
+                    deferredPrompt = null;
+                    closeInstallModal();
+                });
+            }
+        }
+
+        // ==========================================
+        // 2. ESSENS-DATENBANK (SCHWEIZ / BÜRO-SORTIMENT)
+        // Regel: Ausser Döner KEIN Fleisch und KEIN Poulet!
+        // ==========================================
+        const MEAL_DB = {
+            morning06: [
+                { title: "500 ml Wasser + Schwarzer Kaffee / Espresso", place: "Start 06:00 Uhr", kcal: "5 kcal", note: "Hydration direkt nach dem Aufstehen & Koffein-Start." },
+                { title: "500 ml Wasser + Grüntee Sencha & 1 Kaffee", place: "Start 06:00 Uhr", kcal: "5 kcal", note: "Sanfte Energie für den Arbeitsweg." }
+            ],
+            znueni09: [
+                { title: "Migros M-Classic Nuss-Mix (30g) + Grüntee", place: "Migros / Büro", kcal: "190 kcal", note: "Gesunde Fette für Gehirnleistung ohne Zucker-Crash." },
+                { title: "Migros Skyr Nature oder Magerquark + 1 Apfel", place: "Migros", kcal: "185 kcal", note: "Viel Eiweiss, hält lange satt bis 12:00 Uhr." },
+                { title: "Denner Baumnüsse & Mandeln + 1 Banane", place: "Denner", kcal: "210 kcal", note: "Schneller Energie-Boost bei wenig Schlaf." },
+                { title: "Migros Bio Reiswaffeln (3 Stk.) + Hüttenkäse", place: "Migros", kcal: "175 kcal", note: "Leicht, knackig und proteinreich im Büro." },
+                { title: "Denner Studentenfutter (ungesalzen, 35g) + Grüntee", place: "Denner", kcal: "180 kcal", note: "Perfekter Büro-Snack zwischendurch." }
+            ],
+            lunch12: [
+                {
+                    id: "migros_greek",
+                    title: "Griechischer Salat mit Feta & Oliven + Vollkornbrötli",
+                    place: "Migros (Anna's Best)",
+                    tag: "Vegetarisch",
+                    kcal: "460 kcal",
+                    note: "Frisch, knackig, ohne Fleisch – ideal fürs Büro."
+                },
+                {
+                    id: "migros_falafel",
+                    title: "Orient Falafel-Bowl mit Hummus & Kichererbsen",
+                    place: "Migros",
+                    tag: "Vegan",
+                    kcal: "520 kcal",
+                    note: "Pflanzliches Protein, macht bis 17:00 Uhr satt."
+                },
+                {
+                    id: "subway_veggie",
+                    title: "Subway Veggie Delite (15cm oder 30cm Vollkorn) mit Avocado & Käse",
+                    place: "Subway",
+                    tag: "Ohne Fleisch",
+                    kcal: "440 kcal",
+                    note: "Viel frisches Gemüse, kein Fleisch/Poulet, leichte Sauce."
+                },
+                {
+                    id: "linsencurry",
+                    title: "Reis mit aromatischem Linsencurry",
+                    place: "Restaurant / Take-Away",
+                    tag: "Vegetarisch / Vegan",
+                    kcal: "540 kcal",
+                    note: "Rote Linsen liefern top Eiweiss und wärmen."
+                },
+                {
+                    id: "chinese_veg",
+                    title: "Chinesisch: Gebratener Reis oder Nudeln mit Gemüse & Tofu",
+                    place: "China Take-Away",
+                    tag: "Ohne Fleisch/Poulet",
+                    kcal: "560 kcal",
+                    note: "Wichtig: Explizit ohne Poulet/Fleisch bestellen!"
+                },
+                {
+                    id: "denner_caprese",
+                    title: "Denner Mozzarella-Tomaten-Salat + Avocado & Vollkornbrot",
+                    place: "Denner",
+                    tag: "Vegetarisch",
+                    kcal: "490 kcal",
+                    note: "Schnell im Denner geholt, reich an Protein."
+                },
+                {
+                    id: "pizza_veg",
+                    title: "Pizza Verdura (Grillgemüse) oder Pizza Margherita",
+                    place: "Pizzeria",
+                    tag: "Ohne Fleisch",
+                    kcal: "650 kcal",
+                    note: "Ohne Schinken/Salami – am besten einen kleinen Beilagensalat dazu."
+                },
+                {
+                    id: "doener_day",
+                    title: "Döner Kebab oder Dürüm mit extra viel Salat & Joghurtsauce",
+                    place: "Döner-Laden",
+                    tag: "Einziger Fleisch-Tag",
+                    kcal: "640 kcal",
+                    note: "Dein geplanter Döner-Tag in der Woche! Viel Salat reinnehmen."
+                }
+            ],
+            snack15: [
+                { title: "Grüntee + 2 Reihen Dunkle Schokolade (85% Kakao)", place: "Migros / Denner", kcal: "140 kcal", note: "Gegen das Nachmittagstief um 15:00 Uhr." },
+                { title: "Migros Protein-Joghurt oder Quark + Handvoll Beeren", place: "Migros", kcal: "160 kcal", note: "Verhindert Heisshunger auf dem Heimweg um 17 Uhr." },
+                { title: "Denner Cashew- & Mandel-Mix (25g) + Grüntee", place: "Denner", kcal: "155 kcal", note: "Knackiger Fokus-Snack für die letzten 2 Bürostunden." },
+                { title: "2 Karotten / Cherrytomaten + Migros Hummus-Dip", place: "Migros / Denner", kcal: "150 kcal", note: "Volumen-Snack mit wenig Kalorien." }
+            ],
+            eveningCravings: [
+                { title: "Migros Hüttenkäse (200g) mit Gurkenscheiben & Pfeffer", kcal: "180 kcal", tip: "Extrem viel Casein-Protein – sättigt über Nacht." },
+                { title: "Magerquark (200g) mit Zimt & ein paar Himbeeren", kcal: "165 kcal", tip: "Stillt Lust auf Süsses ohne Zuckerbombe." },
+                { title: "Grosse Tasse Pfefferminz- oder Kamillentee + 10 Mandeln", kcal: "70 kcal", tip: "Beruhigt den Magen und hilft beim Einschlafen." },
+                { title: "2 Reiswaffeln mit dünn Hummus oder Frischkäse", kcal: "120 kcal", tip: "Knuspriger Ersatz für Chips am Abend." },
+                { title: "Gemüsesticks (Peperoni, Gurke, Karotte) pur knabbern", kcal: "60 kcal", tip: "Fast null Kalorien, befriedigt das Kau-Bedürfnis." }
+            ]
+        };
+
+        const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"];
+
+        // ==========================================
+        // 3. APP STATE & LOCALSTORAGE
+        // ==========================================
+        const DEFAULT_STATE = {
+            profile: {
+                name: "Emmch",
+                height: 178,
+                startWeight: 88.0,
+                targetWeight: 78.0,
+                waterGoal: 2.75,
+                waterInterval: 45
+            },
+            weightHistory: [
+                { date: getPastDateStr(21), weight: 88.0 },
+                { date: getPastDateStr(14), weight: 87.2 },
+                { date: getPastDateStr(7), weight: 86.4 },
+                { date: getTodayStr(), weight: 85.8 }
+            ],
+            daily: {
+                date: getTodayStr(),
+                waterMl: 0,
+                coffeeCount: 0,
+                checkedMeals: {}
+            },
+            weeklyPlan: null,
+            selectedWeekdayIndex: getCurrentWeekdayIndex()
+        };
+
+        let appState = loadState();
+        let weightChartInstance = null;
+        let timerSecondsLeft = appState.profile.waterInterval * 60;
+
+        function getTodayStr() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function getPastDateStr(daysAgo) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            return d.toISOString().split('T')[0];
+        }
+
+        function getCurrentWeekdayIndex() {
+            const day = new Date().getDay(); // 0=So, 1=Mo ... 5=Fr, 6=Sa
+            if (day >= 1 && day <= 5) return day - 1;
+            return 0; // Wochenende zeigt Montag
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem('emmch_plus_state_v1');
+                if (!raw) {
+                    const init = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                    init.weeklyPlan = generateBalancedWeekPlan();
+                    return init;
+                }
+                const parsed = JSON.parse(raw);
+                // Tages-Reset für Wasser & Kaffee prüfen
+                if (parsed.daily.date !== getTodayStr()) {
+                    parsed.daily = {
+                        date: getTodayStr(),
+                        waterMl: 0,
+                        coffeeCount: 0,
+                        checkedMeals: {}
+                    };
+                }
+                if (!parsed.weeklyPlan) {
+                    parsed.weeklyPlan = generateBalancedWeekPlan();
+                }
+                return parsed;
+            } catch (e) {
+                const fallback = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                fallback.weeklyPlan = generateBalancedWeekPlan();
+                return fallback;
+            }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('emmch_plus_state_v1', JSON.stringify(appState));
+            } catch (e) {
+                console.error("Speicherfehler:", e);
+            }
+        }
+
+        // ==========================================
+        // 4. WOCHENPLAN GENERATOR (ABWECHSLUNGSREICH)
+        // ==========================================
+        function generateBalancedWeekPlan() {
+            // Sicherstellen, dass Döner max. 1x pro Woche vorkommt und andere Gerichte abwechseln
+            const nonDoenerLunches = MEAL_DB.lunch12.filter(m => m.id !== 'doener_day');
+            const doenerMeal = MEAL_DB.lunch12.find(m => m.id === 'doener_day');
+            
+            const shuffledLunches = [...nonDoenerLunches].sort(() => Math.random() - 0.5).slice(0, 4);
+            // Döner an einen zufälligen Tag (z.B. Mittwoch, Donnerstag oder Freitag) setzen
+            const doenerDayIdx = Math.floor(Math.random() * 3) + 2; // Index 2, 3 oder 4
+            shuffledLunches.splice(doenerDayIdx, 0, doenerMeal);
+
+            const plan = {};
+            WEEKDAYS.forEach((dayName, idx) => {
+                plan[idx] = {
+                    morning: MEAL_DB.morning06[idx % MEAL_DB.morning06.length],
+                    znueni: MEAL_DB.znueni09[Math.floor(Math.random() * MEAL_DB.znueni09.length)],
+                    lunch: shuffledLunches[idx],
+                    snack: MEAL_DB.snack15[Math.floor(Math.random() * MEAL_DB.snack15.length)]
+                };
+            });
+            return plan;
+        }
+
+        function regenerateFullWeek() {
+            appState.weeklyPlan = generateBalancedWeekPlan();
+            appState.daily.checkedMeals = {};
+            saveState();
+            renderMealPlanTab();
+            renderDashboard();
+            showSimpleToast("Neuer Wochenplan erstellt! 🔄", "Alle Büro-Mahlzeiten von Mo–Fr wurden frisch kombiniert.");
+        }
+
+        function swapSingleMeal(dayIdx, slot) {
+            if (slot === 'znueni') {
+                const pool = MEAL_DB.znueni09;
+                appState.weeklyPlan[dayIdx].znueni = pool[Math.floor(Math.random() * pool.length)];
+            } else if (slot === 'lunch') {
+                const pool = MEAL_DB.lunch12;
+                let next = pool[Math.floor(Math.random() * pool.length)];
+                if (next.id === appState.weeklyPlan[dayIdx].lunch.id) {
+                    next = pool[(pool.indexOf(next) + 1) % pool.length];
+                }
+                appState.weeklyPlan[dayIdx].lunch = next;
+            } else if (slot === 'snack') {
+                const pool = MEAL_DB.snack15;
+                appState.weeklyPlan[dayIdx].snack = pool[Math.floor(Math.random() * pool.length)];
+            }
+            saveState();
+            renderMealPlanTab();
+            renderDashboard();
+        }
+
+        function toggleMealChecked(mealKey) {
+            appState.daily.checkedMeals[mealKey] = !appState.daily.checkedMeals[mealKey];
+            saveState();
+            renderDashboard();
+            renderMealPlanTab();
+        }
+
+        // ==========================================
+        // 5. WASSER, KAFFEE & ERINNERUNGS-TIMER
+        // ==========================================
+        function addWater(ml) {
+            appState.daily.waterMl += ml;
+            // Timer nach Trinken neu starten
+            timerSecondsLeft = appState.profile.waterInterval * 60;
+            saveState();
+            renderDashboard();
+        }
+
+        function resetWater() {
+            appState.daily.waterMl = 0;
+            saveState();
+            renderDashboard();
+        }
+
+        function addCoffee(type) {
+            appState.daily.coffeeCount += 1;
+            saveState();
+            renderDashboard();
+            showSimpleToast(`${type} verbucht ☕`, "Denk daran: Ein Glas Wasser dazu hält deinen Kreislauf stabil!");
+        }
+
+        function resetCoffee() {
+            appState.daily.coffeeCount = 0;
+            saveState();
+            renderDashboard();
+        }
+
+        // Sanfter Web-Audio-Ping für Wasser-Erinnerung
+        function playWaterChime() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.18); // A5
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {}
+        }
+
+        function startWaterTimerLoop() {
+            setInterval(() => {
+                const now = new Date();
+                const hour = now.getHours();
+                const display = document.getElementById('countdown-display');
+
+                // Aktiv zwischen 06:00 und 21:00 Uhr
+                if (hour >= 6 && hour < 21) {
+                    if (timerSecondsLeft > 0) {
+                        timerSecondsLeft--;
+                    } else {
+                        triggerWaterReminderManual();
+                        timerSecondsLeft = appState.profile.waterInterval * 60;
+                    }
+                    const mins = String(Math.floor(timerSecondsLeft / 60)).padStart(2, '0');
+                    const secs = String(timerSecondsLeft % 60).padStart(2, '0');
+                    if (display) display.textContent = `${mins}:${secs}`;
+                } else {
+                    if (display) display.textContent = "Pause";
+                }
+            }, 1000);
+        }
+
+        function triggerWaterReminderManual() {
+            playWaterChime();
+            const toast = document.getElementById('in-app-toast');
+            document.getElementById('toast-title').textContent = "Zeit für Wasser! 💧";
+            document.getElementById('toast-body').textContent = "Kurze Büro-Pause: Trinke jetzt 250 ml Wasser für deinen Stoffwechsel.";
+            toast.classList.remove('hidden');
+
+            // Falls System-Notifications erlaubt sind
+            if ("Notification" in window && Notification.permission === "granted") {
+                try {
+                    const nOpts = {body: "Zeit für ein Glas Wasser (250 ml) im Büro!", icon: "icon-192.png", badge: "icon-192.png", vibrate: [200,100,200]};
+                    if (navigator.serviceWorker) { navigator.serviceWorker.ready.then(r => r.showNotification("Emmch+ Wasser-Erinnerung 💧", nOpts)); } else { new Notification("Emmch+ Wasser-Erinnerung 💧", nOpts); }
+                } catch (e) {}
+            }
+        }
+
+        function showSimpleToast(title, body) {
+            const toast = document.getElementById('in-app-toast');
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-body').textContent = body;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                hideToast();
+            }, 4000);
+        }
+
+        function hideToast() {
+            document.getElementById('in-app-toast').classList.add('hidden');
+        }
+
+        function requestSystemNotifications() {
+            if (!("Notification" in window)) {
+                showSimpleToast("In-App Erinnerung aktiv", "Dein Browser nutzt den integrierten Emmch+ Timer & Ton.");
+                return;
+            }
+            Notification.requestPermission().then((perm) => {
+                if (perm === "granted") {
+                    triggerWaterReminderManual();
+                } else {
+                    showSimpleToast("In-App Timer aktiv", "Benachrichtigungen laufen direkt über die App-Leiste & Ton.");
+                }
+            });
+        }
+
+        // ==========================================
+        // 6. GEWICHTS-TRACKING & CHART
+        // ==========================================
+        function logNewWeight() {
+            const weightVal = parseFloat(document.getElementById('input-new-weight').value);
+            const dateVal = document.getElementById('input-new-date').value || getTodayStr();
+
+            if (isNaN(weightVal) || weightVal < 35 || weightVal > 250) {
+                showSimpleToast("Ungültiges Gewicht", "Bitte gib ein realistisches Gewicht in kg ein.");
+                return;
+            }
+
+            // Prüfen, ob für dieses Datum schon ein Eintrag existiert -> aktualisieren
+            const existingIdx = appState.weightHistory.findIndex(item => item.date === dateVal);
+            if (existingIdx >= 0) {
+                appState.weightHistory[existingIdx].weight = weightVal;
+            } else {
+                appState.weightHistory.push({ date: dateVal, weight: weightVal });
+            }
+
+            // Chronologisch sortieren
+            appState.weightHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+            saveState();
+
+            document.getElementById('input-new-weight').value = '';
+            renderDashboard();
+            renderWeightTab();
+            showSimpleToast("Gewicht gespeichert! 🎉", `Neuer Eintrag: ${weightVal.toFixed(1)} kg`);
+        }
+
+        function deleteWeightEntry(index) {
+            if (appState.weightHistory.length <= 1) {
+                showSimpleToast("Hinweis", "Mindestens ein Gewichtseintrag muss bestehen bleiben.");
+                return;
+            }
+            appState.weightHistory.splice(index, 1);
+            saveState();
+            renderDashboard();
+            renderWeightTab();
+        }
+
+        function getWeightStats() {
+            const history = appState.weightHistory;
+            const start = appState.profile.startWeight || (history[0] ? history[0].weight : 85);
+            const current = history.length > 0 ? history[history.length - 1].weight : start;
+            const target = appState.profile.targetWeight || 75;
+            const heightM = (appState.profile.height || 175) / 100;
+
+            const lost = start - current;
+            const remaining = Math.max(0, current - target);
+            const totalToLose = Math.max(0.1, start - target);
+            const progressPct = Math.min(100, Math.max(0, (lost / totalToLose) * 100));
+            const bmi = (current / (heightM * heightM)).toFixed(1);
+
+            return { start, current, target, lost, remaining, progressPct, bmi };
+        }
+
+        function renderWeightChart() {
+            const ctx = document.getElementById('weightChart');
+            if (!ctx) return;
+
+            if (weightChartInstance) {
+                weightChartInstance.destroy();
+            }
+
+            const labels = appState.weightHistory.map(e => {
+                const parts = e.date.split('-');
+                return `${parts[2]}.${parts[1]}.`;
+            });
+            const dataPoints = appState.weightHistory.map(e => e.weight);
+
+            weightChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Gewicht (kg)',
+                        data: dataPoints,
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#10B981',
+                        pointBorderColor: '#0B0F17',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94A3B8', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94A3B8', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 7. RENDERING DER TABS
+        // ==========================================
+        function renderDashboard() {
+            const stats = getWeightStats();
+
+            // Datum im Header
+            const options = { weekday: 'long', day: '2-digit', month: 'short' };
+            document.getElementById('header-date').textContent = new Date().toLocaleDateString('de-CH', options);
+
+            // Gewichts-Hero
+            const lostPrefix = stats.lost >= 0 ? `${stats.lost.toFixed(1)} kg abgenommen` : `+${Math.abs(stats.lost).toFixed(1)} kg zum Start`;
+            document.getElementById('dash-lost-text').textContent = lostPrefix;
+            document.getElementById('dash-progress-bar').style.width = `${stats.progressPct}%`;
+            document.getElementById('dash-current-weight').textContent = `${stats.current.toFixed(1)} kg`;
+            document.getElementById('dash-target-weight').textContent = `${stats.target.toFixed(1)} kg`;
+            document.getElementById('dash-remaining-weight').textContent = `${stats.remaining.toFixed(1)} kg`;
+
+            // Wasser
+            const waterLiters = (appState.daily.waterMl / 1000).toFixed(2);
+            const waterGoal = appState.profile.waterGoal;
+            const waterPct = Math.min(100, (appState.daily.waterMl / (waterGoal * 1000)) * 100);
+            document.getElementById('water-current').textContent = waterLiters;
+            document.getElementById('water-goal-label').textContent = waterGoal.toFixed(2);
+            document.getElementById('dash-interval-label').textContent = appState.profile.waterInterval;
+            document.getElementById('water-bar').style.width = `${waterPct}%`;
+
+            // Kaffee
+            document.getElementById('coffee-count').textContent = appState.daily.coffeeCount;
+
+            // Heutiger Essensplan
+            const todayIdx = getCurrentWeekdayIndex();
+            const dayPlan = appState.weeklyPlan[todayIdx];
+            document.getElementById('dash-today-title').textContent = `${WEEKDAYS[todayIdx]} – Büro-Plan`;
+
+            const mealsContainer = document.getElementById('dash-today-meals');
+            const slots = [
+                { key: 'morning', time: '06:00', label: 'Start', data: dayPlan.morning },
+                { key: 'znueni', time: '09:00', label: 'Znüni', data: dayPlan.znueni },
+                { key: 'lunch', time: '12:00', label: 'Mittag', data: dayPlan.lunch },
+                { key: 'snack', time: '15:00', label: 'Snack', data: dayPlan.snack }
+            ];
+
+            mealsContainer.innerHTML = slots.map(s => {
+                const checkId = `${todayIdx}_${s.key}`;
+                const isChecked = !!appState.daily.checkedMeals[checkId];
+                return `
+                    <div onclick="toggleMealChecked('${checkId}')" class="flex items-center gap-3 p-3 rounded-2xl bg-bgDark/70 border ${isChecked ? 'border-emerald-500/40 opacity-60' : 'border-white/5'} cursor-pointer transition">
+                        <div class="w-11 text-center shrink-0">
+                            <span class="block text-xs font-extrabold text-emeraldAccent">${s.time}</span>
+                            <span class="block text-[10px] text-slate-400">${s.label}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-bold text-white truncate ${isChecked ? 'line-through text-slate-400' : ''}">${s.data.title}</p>
+                            <p class="text-[11px] text-slate-400 truncate">${s.data.place} • ${s.data.kcal}</p>
+                        </div>
+                        <div class="w-6 h-6 rounded-full border ${isChecked ? 'bg-emeraldAccent border-emeraldAccent text-bgDark' : 'border-slate-600'} flex items-center justify-center shrink-0">
+                            ${isChecked ? '<i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function renderMealPlanTab() {
+            const selector = document.getElementById('weekday-selector');
+            selector.innerHTML = WEEKDAYS.map((day, idx) => {
+                const active = idx === appState.selectedWeekdayIndex;
+                return `
+                    <button onclick="selectMealDay(${idx})" class="py-2 rounded-xl text-xs font-bold transition ${active ? 'bg-emeraldAccent text-bgDark shadow-md' : 'text-slate-400 hover:text-white'}">
+                        ${day.slice(0, 2)}
+                    </button>
+                `;
+            }).join('');
+
+            const idx = appState.selectedWeekdayIndex;
+            const plan = appState.weeklyPlan[idx];
+            const container = document.getElementById('meal-day-container');
+
+            const cards = [
+                { slot: 'morning', time: '06:00 Uhr', title: 'Morgen-Start (Aufstehen)', item: plan.morning, swappable: false, accent: 'text-amber-400' },
+                { slot: 'znueni', time: '09:00 Uhr', title: 'Büro-Znüni (Vormittag)', item: plan.znueni, swappable: true, accent: 'text-cyan-400' },
+                { slot: 'lunch', time: '12:00 Uhr', title: 'Mittagessen (In der Nähe)', item: plan.lunch, swappable: true, accent: 'text-emeraldAccent' },
+                { slot: 'snack', time: '15:00 Uhr', title: 'Nachmittags-Fokus (bis 17:00)', item: plan.snack, swappable: true, accent: 'text-amber-400' }
+            ];
+
+            container.innerHTML = cards.map(c => `
+                <div class="glass-card rounded-3xl p-4">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider ${c.accent}">${c.time} • ${c.title}</span>
+                        ${c.swappable ? `
+                            <button onclick="swapSingleMeal(${idx}, '${c.slot}')" class="text-[11px] bg-white/5 hover:bg-white/10 text-slate-300 px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 active:scale-95">
+                                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Alternative
+                            </button>
+                        ` : ''}
+                    </div>
+                    <h4 class="font-bold text-sm text-white">${c.item.title}</h4>
+                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                        <span class="text-[11px] px-2.5 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/10">📍 ${c.item.place}</span>
+                        <span class="text-[11px] px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emeraldAccent border border-emerald-500/20">🔥 ${c.item.kcal}</span>
+                        ${c.item.tag ? `<span class="text-[11px] px-2.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">${c.item.tag}</span>` : ''}
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2">${c.item.note}</p>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function selectMealDay(idx) {
+            appState.selectedWeekdayIndex = idx;
+            saveState();
+            renderMealPlanTab();
+        }
+
+        function renderWeightTab() {
+            const stats = getWeightStats();
+            document.getElementById('stat-start-weight').textContent = `${stats.start.toFixed(1)} kg`;
+            document.getElementById('stat-total-diff').textContent = stats.lost >= 0 ? `-${stats.lost.toFixed(1)} kg` : `+${Math.abs(stats.lost).toFixed(1)} kg`;
+            document.getElementById('stat-bmi').textContent = stats.bmi;
+
+            // Default Datum setzen
+            const dateInput = document.getElementById('input-new-date');
+            if (!dateInput.value) dateInput.value = getTodayStr();
+
+            renderWeightChart();
+
+            // Historie umgekehrt (neueste oben)
+            const list = document.getElementById('weight-history-list');
+            const reversed = [...appState.weightHistory].map((item, origIdx) => ({ ...item, origIdx })).reverse();
+
+            list.innerHTML = reversed.map((entry, idx) => {
+                const prevEntry = reversed[idx + 1];
+                let diffBadge = '<span class="text-[11px] text-slate-500">Start</span>';
+                if (prevEntry) {
+                    const diff = entry.weight - prevEntry.weight;
+                    if (diff < 0) {
+                        diffBadge = `<span class="text-[11px] font-bold text-emeraldAccent bg-emerald-500/10 px-2 py-0.5 rounded-md">${diff.toFixed(1)} kg</span>`;
+                    } else if (diff > 0) {
+                        diffBadge = `<span class="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">+${diff.toFixed(1)} kg</span>`;
+                    } else {
+                        diffBadge = `<span class="text-[11px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-md">±0.0 kg</span>`;
+                    }
+                }
+
+                const formattedDate = new Date(entry.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-bgDark/80 border border-white/5">
+                        <div>
+                            <p class="font-bold text-sm text-white">${entry.weight.toFixed(1)} kg</p>
+                            <p class="text-[11px] text-slate-400">${formattedDate}</p>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            ${diffBadge}
+                            <button onclick="deleteWeightEntry(${entry.origIdx})" class="p-1.5 text-slate-500 hover:text-red-400 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function renderProfileTab() {
+            document.getElementById('prof-name').value = appState.profile.name;
+            document.getElementById('prof-height').value = appState.profile.height;
+            document.getElementById('prof-start-weight').value = appState.profile.startWeight;
+            document.getElementById('prof-target-weight').value = appState.profile.targetWeight;
+            document.getElementById('prof-water-goal').value = appState.profile.waterGoal;
+            document.getElementById('prof-water-interval').value = appState.profile.waterInterval;
+        }
+
+        function saveProfileSettings() {
+            const name = document.getElementById('prof-name').value.trim() || "Emmch";
+            const height = parseFloat(document.getElementById('prof-height').value) || 178;
+            const startWeight = parseFloat(document.getElementById('prof-start-weight').value) || 88.0;
+            const targetWeight = parseFloat(document.getElementById('prof-target-weight').value) || 78.0;
+            const waterGoal = parseFloat(document.getElementById('prof-water-goal').value) || 2.75;
+            const waterInterval = parseInt(document.getElementById('prof-water-interval').value) || 45;
+
+            appState.profile = { name, height, startWeight, targetWeight, waterGoal, waterInterval };
+            timerSecondsLeft = waterInterval * 60;
+            saveState();
+
+            renderDashboard();
+            renderWeightTab();
+            showSimpleToast("Profil aktualisiert ✅", "Deine Ziele und der Wasser-Timer wurden gespeichert.");
+        }
+
+        // ==========================================
+        // 8. NAVIGATION & MODALS
+        // ==========================================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emeraldAccent', 'bg-emerald-500/10');
+                btn.classList.add('text-slate-400');
+            });
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            activeBtn.classList.remove('text-slate-400');
+            activeBtn.classList.add('text-emeraldAccent', 'bg-emerald-500/10');
+
+            if (tabName === 'dashboard') renderDashboard();
+            if (tabName === 'meals') renderMealPlanTab();
+            if (tabName === 'weight') renderWeightTab();
+            if (tabName === 'profile') renderProfileTab();
+        }
+
+        function openCravingModal() {
+            renderCravingIdeas();
+            document.getElementById('craving-modal').classList.remove('hidden');
+        }
+
+        function closeCravingModal() {
+            document.getElementById('craving-modal').classList.add('hidden');
+        }
+
+        function renderCravingIdeas() {
+            const shuffled = [...MEAL_DB.eveningCravings].sort(() => Math.random() - 0.5).slice(0, 3);
+            const container = document.getElementById('craving-suggestions');
+            container.innerHTML = shuffled.map(item => `
+                <div class="p-3 rounded-2xl bg-bgDark/90 border border-white/10">
+                    <div class="flex justify-between items-start gap-2">
+                        <h4 class="font-bold text-xs text-white">${item.title}</h4>
+                        <span class="text-[10px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded shrink-0">${item.kcal}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">${item.tip}</p>
+                </div>
+            `).join('');
+        }
+
+        function openInstallModal() {
+            document.getElementById('install-modal').classList.remove('hidden');
+        }
+
+        function closeInstallModal() {
+            document.getElementById('install-modal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 9. INITIALISIERUNG BEIM START
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            renderDashboard();
+            renderMealPlanTab();
+            renderWeightTab();
+            renderProfileTab();
+            startWaterTimerLoop();
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
